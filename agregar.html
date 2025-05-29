@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Agregar Producto</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+  <div class="container mt-5">
+    <h2 class="mb-4 text-primary">🧱 Agregar nuevo producto</h2>
+
+    <form id="productoForm" class="card p-4 shadow-sm bg-white rounded">
+
+      <div class="mb-3">
+        <label for="codigo" class="form-label">Código</label>
+        <input type="text" class="form-control" id="codigo" required>
+      </div>
+
+      <div class="mb-3">
+        <label for="nombre" class="form-label">Nombre</label>
+        <input type="text" class="form-control" id="nombre" required>
+      </div>
+
+      <div class="mb-3">
+        <label for="cantidad" class="form-label">Cantidad</label>
+        <input type="number" class="form-control" id="cantidad" required min="1">
+      </div>
+
+      <div class="mb-3">
+        <label for="precio" class="form-label">Precio Unitario</label>
+        <input type="number" class="form-control" id="precio" required min="0" step="0.01">
+      </div>
+
+      <button type="submit" class="btn btn-success">✅ Guardar</button>
+      <a href="index.html" class="btn btn-secondary ms-2">⬅️ Volver</a>
+    </form>
+
+    <div id="mensaje" class="mt-3"></div>
+  </div>
+
+  <script>
+    const form = document.getElementById("productoForm");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const producto = {
+        codigo: document.getElementById("codigo").value,
+        nombre: document.getElementById("nombre").value,
+        cantidad: parseInt(document.getElementById("cantidad").value),
+        precioUnitario: parseFloat(document.getElementById("precio").value)
+      };
+
+      const respuesta = await fetch("http://localhost:8080/api/productos", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(producto)
+      });
+
+      const mensaje = document.getElementById("mensaje");
+
+      if (respuesta.ok) {
+        mensaje.innerHTML = `<div class="alert alert-success">Producto agregado con éxito 🛠️</div>`;
+        form.reset();
+      } else {
+        const errores = await respuesta.json();
+        mensaje.innerHTML = `<div class="alert alert-danger">Error: ${Array.isArray(errores) ? errores.join(", ") : errores}</div>`;
+      }
+    });
+  </script>
+</body>
+</html>
