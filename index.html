@@ -1,90 +1,173 @@
 <!DOCTYPE html>
+
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Agregar Producto</title>
+  <title>Inventario - El Tornillo Feliz</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
 </head>
 <body class="bg-light">
+  <div class="container mt-4">
+    <h1 class="text-center mb-4 text-success">🛠️ Inventario - El Tornillo Feliz</h1>
 
-  <div class="container d-flex justify-content-center align-items-center" style="height: 100vh;">
-    <div class="card p-4 shadow" style="min-width: 400px;">
-      <h2 class="text-center text-primary mb-4">➕ Agregar Producto</h2>
+```
+<!-- 📢 Mensaje dinámico -->
+<div id="mensajeAlerta"></div>
 
-      <form id="formulario">
-        <div class="mb-3">
-          <label for="codigo" class="form-label">Código</label>
-          <input type="text" id="codigo" class="form-control" required />
-        </div>
-
-        <div class="mb-3">
-          <label for="nombre" class="form-label">Nombre</label>
-          <input type="text" id="nombre" class="form-control" required />
-        </div>
-
-        <div class="mb-3">
-          <label for="cantidad" class="form-label">Cantidad</label>
-          <input type="number" id="cantidad" class="form-control" required min="0" />
-        </div>
-
-        <div class="mb-3">
-          <label for="precio" class="form-label">Precio Unitario</label>
-          <input type="number" step="0.01" id="precio" class="form-control" required min="0" />
-        </div>
-
-        <div class="d-grid gap-2">
-          <button type="submit" class="btn btn-success">💾 Guardar</button>
-          <a href="index.html" class="btn btn-secondary">⬅️ Volver</a>
-        </div>
-      </form>
-
-      <div id="mensaje" class="mt-3"></div>
+<!-- 🔢 MINI DASHBOARD -->
+<div id="dashboard" class="row text-center mb-4">
+  <div class="col-md-4">
+    <div class="card border-success shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">📦 Total Productos</h5>
+        <p class="card-text fs-4" id="totalProductos">0</p>
+      </div>
     </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-warning shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">⚠️ Bajo Stock</h5>
+        <p class="card-text fs-4" id="totalBajoStock">0</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-info shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">💰 Valor Inventario</h5>
+        <p class="card-text fs-4" id="valorTotal">$0.00</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 🔘 Botones -->
+<div class="mb-3 d-flex gap-2">
+  <a href="agregar.html" class="btn btn-primary">➕ Agregar Producto</a>
+  <button class="btn btn-warning" onclick="mostrarBajoStock()">⚠️ Ver Bajo Stock</button>
+  <button id="btnVerTodos" class="btn btn-secondary d-none" onclick="mostrarTodos()">🔄 Ver Todos</button>
+</div>
+
+<!-- 🧾 Tabla -->
+<table class="table table-hover table-bordered bg-white shadow-sm">
+  <thead class="table-dark">
+    <tr>
+      <th>Código</th>
+      <th>Nombre</th>
+      <th>Cantidad</th>
+      <th>Precio</th>
+      <th>Acciones</th>
+    </tr>
+  </thead>
+  <tbody id="tablaProductos"></tbody>
+</table>
+```
+
   </div>
 
   <script>
-    const formulario = document.getElementById("formulario");
-    const mensaje = document.getElementById("mensaje");
+    const tabla = document.getElementById("tablaProductos");
+    let productosGlobal = [];
 
-    formulario.addEventListener("submit", async function (e) {
-      e.preventDefault();
+    fetch("http://localhost:8080/api/productos")
+      .then(res => res.json())
+      .then(productos => {
+        productosGlobal = productos;
+        mostrarProductos(productos);
+        actualizarDashboard(productos);
+      });
 
-      const codigo = document.getElementById("codigo").value;
-      const nombre = document.getElementById("nombre").value;
-      const cantidad = parseInt(document.getElementById("cantidad").value);
-      const precio = parseFloat(document.getElementById("precio").value);
-
-      // Validar código duplicado antes de enviar
-      const yaExiste = await fetch("http://localhost:8080/api/productos")
-        .then(res => res.json())
-        .then(productos => productos.some(p => p.codigo === codigo));
-
-      if (yaExiste) {
-        mensaje.innerHTML = `<div class="alert alert-warning">⚠️ Ya existe un producto con ese código.</div>`;
+    function mostrarProductos(productos) {
+      tabla.innerHTML = "";
+      if (!productos.length) {
+        tabla.innerHTML = `<tr><td colspan="5" class="text-center">🫥 No hay productos registrados.</td></tr>`;
         return;
       }
 
-      // Enviar al backend si pasa la validación
-      const producto = { codigo, nombre, cantidad, precioUnitario: precio };
-
-      const respuesta = await fetch("http://localhost:8080/api/productos", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(producto)
+      productos.forEach(p => {
+        const fila = document.createElement("tr");
+        fila.innerHTML = `
+          <td>${p.codigo}</td>
+          <td>${p.nombre}</td>
+          <td class="${p.cantidad <= 5 ? 'text-danger fw-bold' : ''}">${p.cantidad}</td>
+          <td>$${p.precioUnitario.toFixed(2)}</td>
+          <td>
+            <a href="editar.html?codigo=${p.codigo}" class="btn btn-sm btn-warning me-1">✏️ Editar</a>
+            <button class="btn btn-sm btn-danger" onclick="eliminarProducto('${p.codigo}')">🗑️ Eliminar</button>
+          </td>`;
+        tabla.appendChild(fila);
       });
+    }
 
-      const data = await respuesta.json();
-
-      if (respuesta.ok) {
-        mensaje.innerHTML = `<div class="alert alert-success">✅ Producto agregado con éxito.</div>`;
-        formulario.reset();
-      } else {
-        mensaje.innerHTML = `<div class="alert alert-danger">❌ Error: ${Array.isArray(data) ? data.join(", ") : data}</div>`;
+    function eliminarProducto(codigo) {
+      if (confirm("¿Estás seguro de eliminar este producto?")) {
+        fetch(`http://localhost:8080/api/productos/${codigo}`, {
+          method: "DELETE"
+        })
+          .then(res => {
+            if (res.ok) {
+              alert("🗑️ Producto eliminado");
+              location.reload();
+            } else {
+              alert("❌ No se pudo eliminar");
+            }
+          });
       }
-    });
+    }
+
+    function mostrarTodos() {
+      mostrarProductos(productosGlobal);
+      actualizarDashboard(productosGlobal);
+      document.getElementById("mensajeAlerta").innerHTML = "";
+      document.getElementById("btnVerTodos").classList.add("d-none");
+    }
+
+    function mostrarBajoStock() {
+      fetch("http://localhost:8080/api/productos/bajo-stock")
+        .then(res => res.json())
+        .then(productos => {
+          mostrarProductos(productos);
+          actualizarDashboard(productos);
+
+          const mensajeAlerta = document.getElementById("mensajeAlerta");
+
+          if (productos.length === 0) {
+            mensajeAlerta.innerHTML = `
+              <div class="alert alert-success text-center fw-bold">
+                ✅ Todos los productos están con stock suficiente. ¡Buen trabajo!
+              </div>`;
+          } else {
+            mensajeAlerta.innerHTML = `
+              <div class="alert alert-warning text-center fw-bold">
+                ⚠️ Hay ${productos.length} producto(s) con bajo stock.
+              </div>`;
+          }
+
+          document.getElementById("btnVerTodos").classList.remove("d-none");
+
+          setTimeout(() => mensajeAlerta.innerHTML = "", 5000);
+        })
+        .catch(error => {
+          console.error("Error al obtener bajo stock", error);
+          document.getElementById("mensajeAlerta").innerHTML = `
+            <div class="alert alert-danger text-center fw-bold">
+              ❌ Error al conectar con el servidor.
+            </div>`;
+        });
+    }
+
+    function actualizarDashboard(productos) {
+      const total = productos.length;
+      const bajoStock = productos.filter(p => p.cantidad <= 5).length;
+      const valorTotal = productos.reduce((acc, p) => acc + (p.cantidad * p.precioUnitario), 0);
+
+      document.getElementById("totalProductos").textContent = total;
+      document.getElementById("totalBajoStock").textContent = bajoStock;
+      document.getElementById("valorTotal").textContent = `$${valorTotal.toFixed(2)}`;
+    }
   </script>
+
 </body>
 </html>
