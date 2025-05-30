@@ -11,7 +11,9 @@
 <body class="bg-light">
 
     <div class="container mt-5">
-        <h1 class="mb-4 text-success">🛠 Inventario de Productos</h1>
+        <h1 class="text-center mt-4 text-success">
+            <i class="bi bi-box-seam"></i> Inventario de Productos
+        </h1>
     
         <!-- 🔔 Alerta de bajo stock -->
         <div id="alertaStock"></div>
@@ -128,6 +130,61 @@
           }
         });
     </script>
-      
+
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        fetch("http://localhost:8080/api/productos")
+        .then(res => res.json())
+        .then(data => {
+          const tbody = document.querySelector("tbody");
+          data.forEach(producto => {
+            const fila = document.createElement("tr");
+
+            const tdCodigo = document.createElement("td");
+            tdCodigo.textContent = producto.codigo;
+
+            const tdNombre = document.createElement("td");
+            tdNombre.textContent = producto.nombre;
+
+            const tdCantidad = document.createElement("td");
+            tdCantidad.textContent = producto.cantidad;
+
+            const tdPrecio = document.createElement("td");
+            tdPrecio.textContent = producto.precio;
+
+            const tdAcciones = document.createElement("td");
+            tdAcciones.innerHTML = `
+            <a href="editar.html?codigo=${producto.codigo}" class="btn btn-sm btn-warning me-2">✏️ Editar</a>
+            <button class="btn btn-sm btn-danger" onclick="eliminarProducto('${producto.codigo}')">🗑️ Eliminar</button>
+            `;
+
+            fila.appendChild(tdCodigo);
+            fila.appendChild(tdNombre);
+            fila.appendChild(tdCantidad);
+            fila.appendChild(tdPrecio);
+            fila.appendChild(tdAcciones);
+
+          tbody.appendChild(fila);
+          });
+        });
+      });
+
+      function eliminarProducto(codigo) {
+        if (confirm("¿Estás seguro de que querés eliminar este producto? 😱")) {
+          fetch(`http://localhost:8080/api/productos/${codigo}`, {
+          method: "DELETE"
+          })
+          .then(res => { 
+          if (res.ok) {
+            alert("🗑️ Producto eliminado correctamente");
+            location.reload();
+          } else {
+            alert("❌ No se pudo eliminar el producto");
+          }
+          });
+        }
+      }
+    </script>
+
 </body>
 </html>
