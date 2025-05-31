@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -8,81 +7,144 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
 </head>
 <body class="bg-light">
+  <script>
+    // ************************************************************
+    // CAMBIO CLAVE 1: Protección de sesión basada en JWT
+    // ************************************************************
+    const token = localStorage.getItem("jwtToken");
+    if (!token) {
+      window.location.href = "login.html"; // Redirige al login si no hay token
+    }
+
+    // ************************************************************
+    // NUEVA FUNCIÓN: authenticatedFetch para manejar peticiones con token
+    // Esta función la copiaremos en todos los archivos que interactúen con la API
+    // ************************************************************
+    async function authenticatedFetch(url, options = {}) {
+        const currentToken = localStorage.getItem("jwtToken");
+
+        if (!currentToken) {
+            // Esto debería ser capturado por la primera verificación en el body, pero es una doble capa de seguridad
+            console.warn("No hay token JWT en localStorage. Redirigiendo a login.");
+            window.location.href = "login.html";
+            throw new Error("No token found, redirecting to login.");
+        }
+
+        const headers = {
+            ...options.headers, // Mantener otros headers si existen
+            "Authorization": `Bearer ${currentToken}` // Añadir el token JWT
+        };
+
+        try {
+            const response = await fetch(url, { ...options, headers });
+
+            if (response.status === 401 || response.status === 403) {
+                // ************************************************************
+                // CAMBIO CLAVE 2: Redirección si el backend devuelve 401/403
+                // ************************************************************
+                localStorage.removeItem("jwtToken"); // Limpiar token inválido
+                alert("Tu sesión ha expirado o no estás autorizado. Por favor, inicia sesión de nuevo.");
+                window.location.href = "login.html";
+                return null; // Detener el flujo para evitar errores posteriores
+            }
+
+            if (!response.ok) {
+                // Manejar otros errores HTTP que no sean 401/403 (ej. 404, 500)
+                const errorBody = await response.text(); // O response.json() si tu backend siempre devuelve JSON en errores
+                console.error(`Error en la petición a ${url}: ${response.status} - ${errorBody}`);
+                throw new Error(`Error ${response.status}: ${errorBody}`);
+            }
+
+            return response; // Devolver la respuesta si todo está OK
+        } catch (error) {
+            console.error("Error en authenticatedFetch:", error);
+            // Si hay un error de red o similar, también podrías redirigir o mostrar un mensaje
+            alert("Ocurrió un error de conexión. Por favor, revisa la consola para más detalles.");
+            throw error; // Re-lanzar el error para que la función que llamó pueda manejarlo
+        }
+    }
+  </script>
+
   <div class="container mt-4">
     <h1 class="text-center mb-4 text-success">🛠️ Inventario - El Tornillo Feliz</h1>
 
-```
-<!-- 📢 Mensaje dinámico -->
-<div id="mensajeAlerta"></div>
+    <div id="mensajeAlerta"></div>
 
-<!-- 🔢 MINI DASHBOARD -->
-<div id="dashboard" class="row text-center mb-4">
-  <div class="col-md-4">
-    <div class="card border-success shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title">📦 Total Productos</h5>
-        <p class="card-text fs-4" id="totalProductos">0</p>
+    <div id="dashboard" class="row text-center mb-4">
+      <div class="col-md-4">
+        <div class="card border-success shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title">📦 Total Productos</h5>
+            <p class="card-text fs-4" id="totalProductos">0</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card border-warning shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title">⚠️ Bajo Stock</h5>
+            <p class="card-text fs-4" id="totalBajoStock">0</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card border-info shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title">💰 Valor Inventario</h5>
+            <p class="card-text fs-4" id="valorTotal">$0.00</p>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-  <div class="col-md-4">
-    <div class="card border-warning shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title">⚠️ Bajo Stock</h5>
-        <p class="card-text fs-4" id="totalBajoStock">0</p>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-4">
-    <div class="card border-info shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title">💰 Valor Inventario</h5>
-        <p class="card-text fs-4" id="valorTotal">$0.00</p>
-      </div>
-    </div>
-  </div>
-</div>
 
-<!-- 🔘 Botones -->
-<div class="mb-3 d-flex gap-2">
-  <a href="agregar.html" class="btn btn-primary">➕ Agregar Producto</a>
-  <button class="btn btn-warning" onclick="mostrarBajoStock()">⚠️ Ver Bajo Stock</button>
-  <button id="btnVerTodos" class="btn btn-secondary d-none" onclick="mostrarTodos()">🔄 Ver Todos</button>
-</div>
+    <div class="mb-3 d-flex gap-2">
+      <a href="agregar.html" class="btn btn-primary">➕ Agregar Producto</a>
+      <button class="btn btn-warning" onclick="mostrarBajoStock()">⚠️ Ver Bajo Stock</button>
+      <button id="btnVerTodos" class="btn btn-secondary d-none" onclick="mostrarTodos()">🔄 Ver Todos</button>
+      <button class="btn btn-danger ms-auto" onclick="cerrarSesion()">🚪 Cerrar Sesión</button> </div>
 
-<!-- 🧾 Tabla -->
-<table class="table table-hover table-bordered bg-white shadow-sm">
-  <thead class="table-dark">
-    <tr>
-      <th>Código</th>
-      <th>Nombre</th>
-      <th>Cantidad</th>
-      <th>Precio</th>
-      <th>Acciones</th>
-    </tr>
-  </thead>
-  <tbody id="tablaProductos"></tbody>
-</table>
-```
+    <table class="table table-hover table-bordered bg-white shadow-sm">
+      <thead class="table-dark">
+        <tr>
+          <th>Código</th>
+          <th>Nombre</th>
+          <th>Cantidad</th>
+          <th>Precio</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="tablaProductos"></tbody>
+    </table>
 
   </div>
 
   <script>
+    // La función authenticatedFetch ya está definida arriba, no la dupliques
+
     const tabla = document.getElementById("tablaProductos");
     let productosGlobal = [];
 
-    fetch("http://localhost:8080/api/productos")
-      .then(res => res.json())
+    // ************************************************************
+    // CAMBIO CLAVE 3: Usar authenticatedFetch para todas las peticiones
+    // ************************************************************
+    authenticatedFetch("http://localhost:8080/api/productos")
+      .then(res => res.json()) // Si authenticatedFetch devuelve null, esta línea no se ejecuta
       .then(productos => {
-        productosGlobal = productos;
-        mostrarProductos(productos);
-        actualizarDashboard(productos);
+        if (productos) { // Asegurarse de que productos no sea null si hubo un error manejado por authenticatedFetch
+          productosGlobal = productos;
+          mostrarProductos(productos);
+          actualizarDashboard(productos);
+        }
+      })
+      .catch(error => {
+        console.error("Error al cargar productos iniciales:", error);
+        // Aquí podrías mostrar un mensaje al usuario o hacer algo más
       });
 
     function mostrarProductos(productos) {
       tabla.innerHTML = "";
-      if (!productos.length) {
-        tabla.innerHTML = `<tr><td colspan="5" class="text-center">🫥 No hay productos registrados.</td></tr>`;
+      if (!productos || productos.length === 0) {
+        tabla.innerHTML = `<tr><td colspan="5" class="text-center">🫥 No hay productos registrados o no se pudieron cargar.</td></tr>`;
         return;
       }
 
@@ -101,38 +163,45 @@
       });
     }
 
-    function eliminarProducto(codigo) {
+    async function eliminarProducto(codigo) {
       if (confirm("¿Estás seguro de eliminar este producto?")) {
-        fetch(`http://localhost:8080/api/productos/${codigo}`, {
-          method: "DELETE"
-        })
-          .then(res => {
-            if (res.ok) {
-              alert("🗑️ Producto eliminado");
-              location.reload();
-            } else {
-              alert("❌ No se pudo eliminar");
-            }
+        try {
+          const response = await authenticatedFetch(`http://localhost:8080/api/productos/${codigo}`, {
+            method: "DELETE"
           });
+
+          if (response && response.ok) { // Verificar response no es null y es ok
+            alert("🗑️ Producto eliminado");
+            location.reload(); // Recargar la página para ver los cambios
+          } else if (response) { // Si response existe pero no es ok (y no fue 401/403)
+            alert("❌ No se pudo eliminar el producto.");
+          }
+          // Si response es null, ya hubo redirección por 401/403
+        } catch (error) {
+          console.error("Error al eliminar producto:", error);
+          alert("❌ Ocurrió un error al intentar eliminar el producto.");
+        }
       }
     }
 
     function mostrarTodos() {
+      // No necesita autenticación porque trabaja con productosGlobal, que ya se cargó con authenticatedFetch
       mostrarProductos(productosGlobal);
       actualizarDashboard(productosGlobal);
       document.getElementById("mensajeAlerta").innerHTML = "";
       document.getElementById("btnVerTodos").classList.add("d-none");
     }
 
-    function mostrarBajoStock() {
-      fetch("http://localhost:8080/api/productos/bajo-stock")
-        .then(res => res.json())
-        .then(productos => {
+    async function mostrarBajoStock() {
+      try {
+        const response = await authenticatedFetch("http://localhost:8080/api/productos/bajo-stock");
+        const productos = await response.json();
+
+        if (productos) { // Asegurarse de que productos no sea null
           mostrarProductos(productos);
           actualizarDashboard(productos);
 
           const mensajeAlerta = document.getElementById("mensajeAlerta");
-
           if (productos.length === 0) {
             mensajeAlerta.innerHTML = `
               <div class="alert alert-success text-center fw-bold">
@@ -144,18 +213,16 @@
                 ⚠️ Hay ${productos.length} producto(s) con bajo stock.
               </div>`;
           }
-
           document.getElementById("btnVerTodos").classList.remove("d-none");
-
           setTimeout(() => mensajeAlerta.innerHTML = "", 5000);
-        })
-        .catch(error => {
-          console.error("Error al obtener bajo stock", error);
-          document.getElementById("mensajeAlerta").innerHTML = `
-            <div class="alert alert-danger text-center fw-bold">
-              ❌ Error al conectar con el servidor.
-            </div>`;
-        });
+        }
+      } catch (error) {
+        console.error("Error al obtener bajo stock", error);
+        document.getElementById("mensajeAlerta").innerHTML = `
+          <div class="alert alert-danger text-center fw-bold">
+            ❌ Error al conectar con el servidor para bajo stock.
+          </div>`;
+      }
     }
 
     function actualizarDashboard(productos) {
@@ -166,6 +233,12 @@
       document.getElementById("totalProductos").textContent = total;
       document.getElementById("totalBajoStock").textContent = bajoStock;
       document.getElementById("valorTotal").textContent = `$${valorTotal.toFixed(2)}`;
+    }
+
+    // Nueva función para cerrar sesión
+    function cerrarSesion() {
+        localStorage.removeItem("jwtToken"); // Elimina el token del almacenamiento
+        window.location.href = "login.html"; // Redirige al login
     }
   </script>
 

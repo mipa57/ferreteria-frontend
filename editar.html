@@ -7,6 +7,56 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
 </head>
 <body class="bg-light">
+  <script>
+    // ************************************************************
+    // CAMBIO CLAVE 1: Protección de sesión basada en JWT (igual que index.html)
+    // ************************************************************
+    const token = localStorage.getItem("jwtToken");
+    if (!token) {
+      window.location.href = "login.html";
+    }
+
+    // ************************************************************
+    // NUEVA FUNCIÓN: authenticatedFetch (copiar la misma de index.html)
+    // ************************************************************
+    async function authenticatedFetch(url, options = {}) {
+        const currentToken = localStorage.getItem("jwtToken");
+
+        if (!currentToken) {
+            console.warn("No hay token JWT en localStorage. Redirigiendo a login.");
+            window.location.href = "login.html";
+            throw new Error("No token found, redirecting to login.");
+        }
+
+        const headers = {
+            ...options.headers,
+            "Authorization": `Bearer ${currentToken}`
+        };
+
+        try {
+            const response = await fetch(url, { ...options, headers });
+
+            if (response.status === 401 || response.status === 403) {
+                localStorage.removeItem("jwtToken");
+                alert("Tu sesión ha expirado o no estás autorizado. Por favor, inicia sesión de nuevo.");
+                window.location.href = "login.html";
+                return null;
+            }
+
+            if (!response.ok) {
+                const errorBody = await response.text();
+                console.error(`Error en la petición a ${url}: ${response.status} - ${errorBody}`);
+                throw new Error(`Error ${response.status}: ${errorBody}`);
+            }
+
+            return response;
+        } catch (error) {
+            console.error("Error en authenticatedFetch:", error);
+            alert("Ocurrió un error de conexión. Por favor, revisa la consola para más detalles.");
+            throw error;
+        }
+    }
+  </script>
 
   <div class="container d-flex justify-content-center align-items-center vh-100">
     <div class="card shadow-lg p-4" style="min-width: 400px;">
@@ -42,6 +92,8 @@
   </div>
 
   <script>
+    // La función authenticatedFetch ya está definida arriba, no la dupliques
+
     const params = new URLSearchParams(window.location.search);
     const codigo = params.get("codigo");
 
@@ -50,16 +102,25 @@
     const cantidadInput = document.getElementById("cantidad");
     const precioInput = document.getElementById("precio");
 
-    fetch(`http://localhost:8080/api/productos/${codigo}`)
+    // ************************************************************
+    // CAMBIO CLAVE 2: Usar authenticatedFetch para obtener el producto
+    // ************************************************************
+    authenticatedFetch(`http://localhost:8080/api/productos/${codigo}`)
       .then(res => res.json())
       .then(producto => {
-        codigoInput.value = producto.codigo;
-        nombreInput.value = producto.nombre;
-        cantidadInput.value = producto.cantidad;
-        precioInput.value = producto.precioUnitario;
+        if (producto) { // Asegurarse de que el producto no sea null
+          codigoInput.value = producto.codigo;
+          nombreInput.value = producto.nombre;
+          cantidadInput.value = producto.cantidad;
+          precioInput.value = producto.precioUnitario;
+        }
+      })
+      .catch(error => {
+        console.error("Error al cargar datos del producto para edición:", error);
+        alert("No se pudo cargar la información del producto. Intenta de nuevo.");
       });
 
-    document.getElementById("formulario").addEventListener("submit", function(e) {
+    document.getElementById("formulario").addEventListener("submit", async function(e) {
       e.preventDefault();
 
       const productoActualizado = {
@@ -69,19 +130,26 @@
         precioUnitario: parseFloat(precioInput.value)
       };
 
-      fetch(`http://localhost:8080/api/productos/${codigo}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(productoActualizado)
-      })
-      .then(res => {
-        if (res.ok) {
+      // ************************************************************
+      // CAMBIO CLAVE 3: Usar authenticatedFetch para actualizar el producto
+      // ************************************************************
+      try {
+        const respuesta = await authenticatedFetch(`http://localhost:8080/api/productos/${codigo}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(productoActualizado)
+        });
+
+        if (respuesta && respuesta.ok) {
           alert("✅ Producto actualizado correctamente");
           window.location.href = "index.html";
-        } else {
-          alert("❌ Error al actualizar el producto");
+        } else if (respuesta) {
+          alert("❌ Error al actualizar el producto.");
         }
-      });
+      } catch (error) {
+        console.error("Error al actualizar el producto:", error);
+        alert("❌ Ocurrió un error al intentar actualizar el producto.");
+      }
     });
   </script>
 
