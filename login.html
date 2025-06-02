@@ -44,6 +44,18 @@
         return;
       }
 
+      console.log("Intentando iniciar sesión con:");
+      console.log("Usuario capturado:", usuario);
+      console.log("Contraseña capturada:", password);
+
+      // Creamos el objeto que enviaremos como JSON
+      const requestBody = {
+        username: usuario,
+        password: password
+      };
+      console.log("Objeto JSON a enviar:", requestBody); // <--- NUEVA LÍNEA CLAV
+
+
       try {
         // Hacemos la petición al backend para autenticar
         const response = await fetch("http://localhost:8080/api/auth/login", { // Ajusta esta URL a tu endpoint de login en Spring Boot
